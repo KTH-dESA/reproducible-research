@@ -145,69 +145,32 @@ declarative, not imperative.
 
 ## Solution 3: Using [Snakemake](https://snakemake.readthedocs.io/en/stable/index.html)
 
-First study the `Snakefile`:
-
-```python
-# a list of all the model runs we are analyzing
-DATA = glob_wildcards('data/{model run}.txt').model run
-
-# this is for running on HPC resources
-localrules: all, clean, make_archive
-
-# the default rule
-rule all:
-    input:
-        'zipf_analysis.tar.gz'
-
-# delete everything so we can re-run things
-rule clean:
-    shell:
-        '''
-        rm -rf source/__pycache__
-        rm -f zipf_analysis.tar.gz processed_data/* results/*
-        '''
-
-# count words in one of our model runs
-# logfiles from each run are put in .log files"
-rule count_words:
-    input:
-        wc='source/wordcount.py',
-        model run='data/{file}.txt'
-    output: 'processed_data/{file}.dat'
-    log: 'processed_data/{file}.log'
-    shell:
-        '''
-        echo "Running {input.wc} on {input.model run}." &> {log} &&
-            python {input.wc} {input.model run} {output} >> {log} 2>&1
-        '''
-
-# create a plot for each model run
-rule make_plot:
-    input:
-        plotcount='source/plotcount.py',
-        model run='processed_data/{file}.dat'
-    output: 'results/{file}.png'
-    shell: 'python {input.plotcount} {input.model run} {output}'
-
-# generate summary table
-rule zipf_test:
-    input:
-        zipf='source/zipf_test.py',
-        model runs=expand('processed_data/{model run}.dat', model run=DATA)
-    output: 'results/results.txt'
-    shell:  'python {input.zipf} {input.model runs} > {output}'
-
-# create an archive with all of our results
-rule make_archive:
-    input:
-        expand('results/{model run}.png', model run=DATA),
-        expand('processed_data/{model run}.dat', model run=DATA),
-        'results/results.txt'
-    output: 'zipf_analysis.tar.gz'
-    shell: 'tar -czvf {output} {input}'
+Switch to the `simple` branch:
+```shell
+git checkout simple
 ```
 
-Also Snakemake uses **declarative style**:
+First study a simple `Snakefile`:
+
+```python
+rule all:
+	input: "processed_data/SelectedResults.csv"
+    ...
+
+rule solve:
+	input: data="data/simplicity.txt", model="model/osemosys.txt"
+	output: results="processed_data/results.sol", default="processed_data/SelectedResults.csv"
+	log: "processed_data/glpsol.log"
+    ...
+	shell:
+		"glpsol -d {input.data} -m {input.model} -o {output.results} > {log}"
+
+rule clean:
+	shell:
+		"rm -f processed_data/*.sol processed_data/*.csv processed_data/*.log"
+```
+
+Snakemake uses the **declarative style**:
 
 <img src="{{ site.baseurl }}/img/snakemake.png" style="height: 250px;"/>
 
@@ -225,12 +188,12 @@ Building DAG of jobs...
 Nothing to be done.
 ```
 
-Make a modification to a txt or a dat file and run `snakemake` again and discuss
+Make a modification to the data file and run `snakemake` again and discuss
 what you see. One way to modify files is to use the `touch` command which will
 only update its timestamp:
 
 ```
-$ touch data/sierra.txt
+$ touch data/simplicity.txt
 $ snakemake
 ```
 
@@ -241,6 +204,150 @@ $ snakemake clean
 $ snakemake -j 4
 ```
 
+> ## Exercise: extending the simple example
+>
+> Create snakemake rules to extract our data tables and write them to a csv file.
+>
+> Hint: 
+>
+> `head -n 326 processed_data/SelectedResults.csv | tail -n 29 > processed_data/total_annual_capacity.csv`
+> `head -n 33 processed_data/SelectedResults.csv | tail -n 22 > processed_data/tid_demand.csv`
+> 
+{: .task}
+
+## Solution
+
+```python
+rule extract_tid_demand:
+	input: "processed_data/SelectedResults.csv"
+	output: "processed_data/tid_demand.csv"
+	shell:
+		"head -n 33 {input} | tail -n 22 > {output}"
+```
+
+> ## Exercise: plotting the csv files
+>
+> Create snakemake rules to generate the plots:
+>
+> Hint:
+>
+> `python scripts/plot_results.py processed_data/total_annual_capacity.csv results/total_annual_capacity.pdf`
+> `python scripts/plot_results.py processed_data/tid_demand.csv results/tid_demand.pdf`
+>
+{: .task}
+
+After creating your new rules, try running `snakemake`.  Why does nothing happen?
+
+## Creating targets
+
+The first command in your snakemake file should contain a list of targets - the final elements you
+want to produce.
+
+```python
+RESULTS = ['tid_demand', 'total_annual_capacity']
+
+rule all:
+	input: expand("processed_data/{x}.pdf", x=RESULTS)
+	message: "Running pipeline to generate the files '{input}'"
+```
+
+## Generalising Snakemake Rules
+
+Switch to the `general` branch:
+
+```shell
+$ git checkout general
+```
+
+The rules we made in the previous exercise were very very similar to one another.
+
+This is a common coding "smell" and should be a warning to you to *refactor* your code.
+
+```python
+
+rule plot:
+	input: "processed_data/{result}.csv"
+	output: "processed_data/{result}.pdf"
+	message: "Generating plot using '{input}' and writing to '{output}'"
+	shell:
+		"python scripts/plot_results.py {input} {output}"
+```
+
+## Environments
+
+If you install snakemake with conda, you can define conda environments *per rule*.
+
+```python
+rule solve:
+	input: data="data/simplicity.txt", model="model/osemosys.txt"
+	output: results="processed_data/results.sol", default="processed_data/SelectedResults.csv"
+	log: "processed_data/glpsol.log"
+	conda: "env/osemosys.yaml"
+	shell:
+		"glpsol -d {input.data} -m {input.model} -o {output.results} > {log}"
+```
+
+The `env/osemosys.yaml` file:
+```yaml
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - glpk
+```
+
+Then, running snakemake with the `--use-conda` flag:
+
+```
+$ snakemake --use-conda --cores 2
+Building DAG of jobs...
+Using shell: /usr/local/bin/bash
+Provided cores: 2
+Rules claiming more threads will be scaled down.
+Job counts:
+	count	jobs
+	1	all
+	1	extract_tid_demand
+	1	extract_total_annual_capacity
+	2	plot
+	1	solve
+	6
+
+[Wed Sep 11 22:53:50 2019]
+rule solve:
+    input: data/simplicity.txt, model/osemosys.txt
+    output: processed_data/results.sol, processed_data/SelectedResults.csv
+    log: processed_data/glpsol.log
+    jobid: 5
+
+Activating conda environment: /Users/wusher/repository/osemosys_snakemake/.snakemake/conda/6fbfeaaf
+[Wed Sep 11 22:54:09 2019]
+Finished job 5.
+1 of 6 steps (17%) done
+```
+
+## Running models runs in parallel
+
+```shell
+git checkout model_runs
+```
+
+We need to wrap OSeMOSYS in a little shell script to allow it to run in parallel. This allows us to change the destination of the results file which is written out:
+
+```bash
+#!/usr/bin/env bash
+MODELRUN=$1
+RESULTS="processed_data\/$MODELRUN\/SelectedResults.csv"
+mkdir processed_data/$MODELRUN
+cat model/osemosys.txt > processed_data/$MODELRUN/osemosys.txt
+sed -i '' "s/FILEPATH/$RESULTS/g" processed_data/$MODELRUN/osemosys.txt
+```
+
+You can choose as many cores as your laptop will cope with:
+
+```shell
+snakemake --use-conda --cores 8
+```
 
 ### Why Snakemake?
 
@@ -262,6 +369,8 @@ $ snakemake -j 4
 
 
 ### Visualizing the workflow
+
+If you're using the OSeMOSYS example, try running `snakemake plot_dag`.
 
 We can visualize the directed acyclic graph (DAG) of our current Snakefile
 using the `--dag` option, which will output the DAG in `dot` language (a
