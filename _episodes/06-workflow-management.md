@@ -16,7 +16,7 @@ keypoints:
   - Sometimes a script is enough.
 ---
 
-## One problem solved in 5 different ways
+## One problem solved in different ways
 
 > The following material is adapted from a [HPC Carpentry lesson](https://hpc-carpentry.github.io/hpc-python/)
 
@@ -26,6 +26,7 @@ The project runs OSeMOSYS and plots a couple of charts.
 To follow along, clone this [repository](https://github.com/KTH-dESA/osemosys_workflow):
 ```shell
 $ git clone https://github.com/KTH-dESA/osemosys_workflow.git
+$ git checkout simple
 ```
 
 The example project directory listing is:
@@ -51,7 +52,7 @@ The example project directory listing is:
 
 In this example we wish to:
 1. Run a model run
-2. Extract some csv files from the `SelectedResults.csv` file
+2. Extract some results from the `SelectedResults.csv` file and save them into separate csv files
 3. Plot those results
 
 Ideally, we would go on to:
