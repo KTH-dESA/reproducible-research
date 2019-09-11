@@ -200,7 +200,7 @@ You can try a dry run with the `-n` flag, if you're not sure what's going to be 
 
 ```
 $ snakemake clean
-$ snakemake --n
+$ snakemake -n
 ```
 
 > ## Exercise: extending the simple example
