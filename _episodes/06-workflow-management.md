@@ -156,13 +156,11 @@ First study a simple `Snakefile`:
 ```python
 rule all:
 	input: "processed_data/SelectedResults.csv"
-    ...
 
 rule solve:
 	input: data="data/simplicity.txt", model="model/osemosys.txt"
 	output: results="processed_data/results.sol", default="processed_data/SelectedResults.csv"
 	log: "processed_data/glpsol.log"
-    ...
 	shell:
 		"glpsol -d {input.data} -m {input.model} -o {output.results} > {log}"
 
@@ -212,6 +210,7 @@ $ snakemake --n
 > Hint: 
 >
 > `head -n 326 processed_data/SelectedResults.csv | tail -n 29 > processed_data/total_annual_capacity.csv`
+>
 > `head -n 33 processed_data/SelectedResults.csv | tail -n 22 > processed_data/tid_demand.csv`
 > 
 {: .task}
@@ -233,6 +232,7 @@ rule extract_tid_demand:
 > Hint:
 >
 > `python scripts/plot_results.py processed_data/total_annual_capacity.csv results/total_annual_capacity.pdf`
+>
 > `python scripts/plot_results.py processed_data/tid_demand.csv results/tid_demand.pdf`
 >
 {: .task}
