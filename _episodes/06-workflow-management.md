@@ -198,11 +198,11 @@ $ touch data/simplicity.txt
 $ snakemake
 ```
 
-Finally try to run the pipeline on several cores in parallel (here we will try 4):
+You can try a dry run with the `-n` flag, if you're not sure what's going to be built:
 
 ```
 $ snakemake clean
-$ snakemake -j 4
+$ snakemake --n
 ```
 
 > ## Exercise: extending the simple example
