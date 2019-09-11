@@ -1,6 +1,6 @@
 ---
 layout: episode
-title: "Recording computational steps"
+title: "Recording computational steps for OSeMOSYS"
 teaching: 15
 exercises: 25
 questions:
@@ -21,193 +21,107 @@ keypoints:
 > The following material is adapted from a [HPC Carpentry lesson](https://hpc-carpentry.github.io/hpc-python/)
 
 Let's look at an example project which follows the project structure guidelines given in the previous episode.
-The project is about counting the frequency distribution of words in a given text, plotting bar charts and testing
-[Zipf's law](https://en.wikipedia.org/wiki/Zipf%27s_law).
+The project runs OSeMOSYS and plots a couple of charts.
 
-To follow along, clone this [repository](https://github.com/coderefinery/word-count):
+To follow along, clone this [repository](https://github.com/KTH-dESA/osemosys_workflow):
 ```shell
-$ git clone https://github.com/coderefinery/word-count-aalborg.git
+$ git clone https://github.com/KTH-dESA/osemosys_workflow.git
 ```
 
 The example project directory listing is:
 ```
 .
-├── data
-│   ├── abyss.txt
-│   ├── isles.txt
-│   ├── last.txt
-│   ├── LICENSE_TEXTS.md
-│   └── sierra.txt
-├── doc
-│   ├── ...
-│   ...
-├── Dockerfile
-├── LICENSE
-├── Makefile
-├── manuscript
-├── matplotlibrc
-├── processed_data
 ├── README.md
-├── requirements.txt
-├── results
-├── Snakefile
-└── source
-    ├── plotcount.py
-    ├── wordcount.py
-    └── zipf_test.py
+├── data
+│   ├── README.md
+│   └── simplicity.txt
+├── env
+│   ├── dag.yaml
+│   ├── osemosys.yaml
+│   └── plot.yaml
+├── model
+│   ├── LICENSE
+│   └── osemosys.txt
+├── processed_data
+├── scripts
+│   ├── osemosys_run.sh
+│   └── plot_results.py
+└── snakefile
 ```
 
 In this example we wish to:
-1. Analyze word frequencies using `wordcount.py` for 4 books (they are all in the `data` directory)
-2. Plot a histogram using `plotcount.py`
-3. Print the ratio between most common and second most common word for all books
+1. Run a model run
+2. Extract some csv files from the `SelectedResults.csv` file
+3. Plot those results
 
-Example (for one book only) - let us test this out:
+Ideally, we would go on to:
+4. Create environments for each of the key tasks
+5. Run model runs in parallel and scale them up for running on a cluster
+
+
+## The Problem
+
+Example (for one model run only) - let us test this out:
 
 ```
-$ python source/wordcount.py data/isles.txt processed_data/isles.dat
-$ python source/plotcount.py processed_data/isles.dat processed_data/isles.png
-$ python source/zipf_test.py processed_data/isles.dat
+$ glpsol -d data/simplicity.txt -m model/osemosys.txt -o process_data/results.sol
+$ ???
+$ python scripts/plot_results.py processed_data/total_annual_capacity.csv results/total_annual_capacity.pdf
+$ ???
+$ python scripts/plot_results.py processed_data/tid_demand.csv results/tid_demand.pdf
 ```
 
 Can you relate? Are you using similar setups in your research?
 
-This was for one book - how about 3 books? How about 3000 books?
+This was for one model run - how about 3 model runs? How about 3000 model runs?
 
-**We will solve this solved in 5 different ways and discuss pros and cons.**
-
----
-
-## Solution 1: Graphical user interface (GUI)
-
-Disclaimer: not all GUIs behave this way - there exist very good GUI solutions which enable
-reproducibility and automation.
-
-Imagine we have programmed a GUI with a nice interface with icons where you can select scripts and input files by clicking:
-- Click on counting script
-- Select book txt file
-- Give a name for the dat file
-- Click on a run symbol
-- Click on plotting script
-- Select book dat file
-- Give a name for the image file
-- Click on a run symbol
-- ...
-- Go to next book ...
-- Click on counting script
-- Select book txt file
-- ...
-
-> ## Exercise/discussion
+> ## Discussion
 >
-> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of books? Can it be automated?
+> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of model runs? Can it be automated?
+> What if you modify only one data file and do not wish to rerun the pipeline for all datafiles again?
+{: .task}
+
+> ## Exercise
+>
+> What commands are required to replace the `???` in the second line?
+> Think back to the first workshop on the shell...
 {: .task}
 
 ---
 
-## Solution 2: Manual steps
+## Solution 1: Script
 
-It is not too much work:
-```
-$ python source/wordcount.py data/abyss.txt processed_data/abyss.dat
-$ python source/plotcount.py processed_data/abyss.dat processed_data/abyss.png
-
-$ python source/wordcount.py data/isles.txt processed_data/isles.dat
-$ python source/plotcount.py processed_data/isles.dat processed_data/isles.png
-
-$ python source/wordcount.py data/last.txt processed_data/last.dat
-$ python source/plotcount.py processed_data/last.dat processed_data/last.png
-
-$ python source/wordcount.py data/sierra.txt processed_data/sierra.dat
-$ python source/plotcount.py processed_data/sierra.dat processed_data/sierra.png
-
-$ python source/zipf_test.py processed_data/abyss.dat processed_data/isles.dat processed_data/last.dat processed_data/sierra.dat
-```
-
-This is **imperative style**: first do this, then to that, then do that, finally do ...
-
-> ## Exercise/discussion
->
-> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of books? Can it be automated?
-{: .task}
-
----
-
-## Solution 3: Script
-
-Let's express it more compactly with a shell script (Bash). Let's call it `script.sh`:
-```
+Let's express it more compactly with a shell script (Bash). Let's call it `run_analysis.sh`:
+```bash
 #!/usr/bin/env bash
-
-# loop over all books
-for title in abyss isles last sierra; do
-    python source/wordcount.py data/${title}.txt processed_data/${title}.dat
-    python source/plotcount.py processed_data/${title}.dat processed_data/${title}.png
-done
-
-# this could be done using variables but nevermind
-python source/zipf_test.py processed_data/abyss.dat processed_data/isles.dat processed_data/last.dat processed_data/sierra.dat
+glpsol -d data/simplicity.txt -m model/osemosys.txt -o process_data/results.sol
+head -n 326 processed_data/SelectedResults.csv | tail -n 29 > processed_data/total_annual_capacity.csv
+python scripts/plot_results.py processed_data/total_annual_capacity.csv results/total_annual_capacity.pdf
+head -n 33 processed_data/SelectedResults.csv | tail -n 22 > processed_data/tid_demand.csv
+python scripts/plot_results.py processed_data/tid_demand.csv results/tid_demand.pdf
 ```
 
 We can run it with:
 ```
-$ bash script.sh
+$ run_analysis.sh
 ```
 
 This is still **imperative style**: we tell the script to run these steps in precisely this order.
 
 > ## Exercise/discussion
 >
-> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of books? Can it be automated?
-> What if you modify only one book and do not wish to rerun the pipeline for all books again?
+> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of model runs? Can it be automated?
+> What if you modify only one data file and do not wish to rerun the pipeline for all datafiles again?
 {: .task}
 
 ---
 
-## Solution 4: Using [GNU Make](https://www.gnu.org/software/make/)
-
-First study the `Makefile`:
-```makefile
-# directory containing source data
-SRCDIR := data
-
-# directory containing intermediate data
-TMPDIR := processed_data
-
-# results directory
-RESDIR := results
-
-# all source files (book texts)
-SRCS = $(wildcard $(SRCDIR)/*.txt)
-
-# all intermediate data files
-DATA = $(patsubst $(SRCDIR)/%.txt,$(TMPDIR)/%.dat,$(SRCS))
-
-# all images
-IMAGES = $(patsubst $(SRCDIR)/%.txt,$(RESDIR)/%.png,$(SRCS))
-
-all: $(DATA) $(IMAGES) $(RESDIR)/results.txt
-
-$(TMPDIR)/%.dat: $(SRCDIR)/%.txt source/wordcount.py
-        python source/wordcount.py $< $@
-
-$(RESDIR)/%.png: $(TMPDIR)/%.dat source/plotcount.py
-        python source/plotcount.py $< $@
-
-$(RESDIR)/results.txt: $(DATA) source/zipf_test.py
-        python source/zipf_test.py $(DATA) > $@
-
-clean:
-        @$(RM) $(TMPDIR)/*
-        @$(RM) $(RESDIR)/*
-
-.PHONY: clean directories
-```
+## Solution 2: Using [GNU Make](https://www.gnu.org/software/make/)
 
 - A tool from the 70s often used to build software.
 - Uses specific syntax that the user writes in a Makefile.
 - Makefile specifies how to build targets from their dependencies.
-- Observe that we use wildcards instead of explicit book names.
+- Observe that we use wildcards instead of explicit model run names.
 
 It contains rules that relate targets to dependencies and commands:
 
@@ -223,55 +137,19 @@ outputs: inputs
 	command(s)
 ```
 
-Try it out:
-```
-$ make clean
-$ make
-```
-
 Make uses **declarative style**: we describe dependencies but we let Make
 figure out the series of steps to produce results (targets). Fun fact: Excel is also
 declarative, not imperative.
 
-Try running `make` again and discuss why it refused to rerun all steps:
-```
-$ make
-
-make: Nothing to be done for 'all'.
-```
-
-Make a modification to a txt or a dat file and run `make` again and discuss
-what you see. One way to modify files is to use the `touch` command which will
-only update its timestamp:
-
-```
-$ touch data/sierra.txt
-$ make
-```
-
-How did Make know which steps to rerun?
-
-Finally try to run the pipeline on several cores in parallel (here we will try 4):
-
-```
-$ make clean
-$ make -j 4
-```
-
-> ## Exercise/discussion
->
-> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of books? Can it be automated?
-{: .task}
-
 ---
 
-## Solution 5: Using [Snakemake](https://snakemake.readthedocs.io/en/stable/index.html)
+## Solution 3: Using [Snakemake](https://snakemake.readthedocs.io/en/stable/index.html)
 
 First study the `Snakefile`:
 
 ```python
-# a list of all the books we are analyzing
-DATA = glob_wildcards('data/{book}.txt').book
+# a list of all the model runs we are analyzing
+DATA = glob_wildcards('data/{model run}.txt').model run
 
 # this is for running on HPC resources
 localrules: all, clean, make_archive
@@ -289,41 +167,41 @@ rule clean:
         rm -f zipf_analysis.tar.gz processed_data/* results/*
         '''
 
-# count words in one of our books
+# count words in one of our model runs
 # logfiles from each run are put in .log files"
 rule count_words:
     input:
         wc='source/wordcount.py',
-        book='data/{file}.txt'
+        model run='data/{file}.txt'
     output: 'processed_data/{file}.dat'
     log: 'processed_data/{file}.log'
     shell:
         '''
-        echo "Running {input.wc} on {input.book}." &> {log} &&
-            python {input.wc} {input.book} {output} >> {log} 2>&1
+        echo "Running {input.wc} on {input.model run}." &> {log} &&
+            python {input.wc} {input.model run} {output} >> {log} 2>&1
         '''
 
-# create a plot for each book
+# create a plot for each model run
 rule make_plot:
     input:
         plotcount='source/plotcount.py',
-        book='processed_data/{file}.dat'
+        model run='processed_data/{file}.dat'
     output: 'results/{file}.png'
-    shell: 'python {input.plotcount} {input.book} {output}'
+    shell: 'python {input.plotcount} {input.model run} {output}'
 
 # generate summary table
 rule zipf_test:
     input:
         zipf='source/zipf_test.py',
-        books=expand('processed_data/{book}.dat', book=DATA)
+        model runs=expand('processed_data/{model run}.dat', model run=DATA)
     output: 'results/results.txt'
-    shell:  'python {input.zipf} {input.books} > {output}'
+    shell:  'python {input.zipf} {input.model runs} > {output}'
 
 # create an archive with all of our results
 rule make_archive:
     input:
-        expand('results/{book}.png', book=DATA),
-        expand('processed_data/{book}.dat', book=DATA),
+        expand('results/{model run}.png', model run=DATA),
+        expand('processed_data/{model run}.dat', model run=DATA),
         'results/results.txt'
     output: 'zipf_analysis.tar.gz'
     shell: 'tar -czvf {output} {input}'
@@ -399,7 +277,7 @@ Rules that have yet to be completed are indicated with solid outlines, while alr
 
 > ## Exercise/discussion
 >
-> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of books? Can it be automated?
+> Discuss the pros and cons of this approach. Is it reproducible? Does it scale to hundreds of model runs? Can it be automated?
 {: .task}
 
 
