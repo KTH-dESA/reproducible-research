@@ -65,7 +65,7 @@ Ideally, we would go on to:
 Example (for one model run only) - let us test this out:
 
 ```
-$ glpsol -d data/simplicity.txt -m model/osemosys.txt -o process_data/results.sol
+$ glpsol -d data/simplicity.txt -m model/osemosys.txt -o processed_data/results.sol
 $ ???
 $ python scripts/plot_results.py processed_data/total_annual_capacity.csv results/total_annual_capacity.pdf
 $ ???
@@ -95,7 +95,7 @@ This was for one model run - how about 3 model runs? How about 3000 model runs?
 Let's express it more compactly with a shell script (Bash). Let's call it `run_analysis.sh`:
 ```bash
 #!/usr/bin/env bash
-glpsol -d data/simplicity.txt -m model/osemosys.txt -o process_data/results.sol
+glpsol -d data/simplicity.txt -m model/osemosys.txt -o processed_data/results.sol
 head -n 326 processed_data/SelectedResults.csv | tail -n 29 > processed_data/total_annual_capacity.csv
 python scripts/plot_results.py processed_data/total_annual_capacity.csv results/total_annual_capacity.pdf
 head -n 33 processed_data/SelectedResults.csv | tail -n 22 > processed_data/tid_demand.csv
@@ -207,12 +207,12 @@ $ snakemake -n
 >
 > Create snakemake rules to extract our data tables and write them to a csv file.
 >
-> Hint: 
+> Hint:
 >
 > `head -n 326 processed_data/SelectedResults.csv | tail -n 29 > processed_data/total_annual_capacity.csv`
 >
 > `head -n 33 processed_data/SelectedResults.csv | tail -n 22 > processed_data/tid_demand.csv`
-> 
+>
 {: .task}
 
 ## Solution
